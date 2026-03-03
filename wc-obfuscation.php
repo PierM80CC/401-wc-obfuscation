@@ -22,14 +22,18 @@ define( 'WCO_VERSION', '1.0.0' );
  * @return bool
  */
 function wco_should_load(): bool {
-	return (bool) apply_filters( 'wco_should_load', is_product() );
+	static $should_load = null;
+	if ( null === $should_load ) {
+		$should_load = (bool) apply_filters( 'wco_should_load', is_product() );
+	}
+	return $should_load;
 }
 
 /**
  * Obfuscate attribute links on single product pages.
  *
  * @param string $html      Formatted attribute HTML.
- * @param object $attribute Attribute object.
+ * @param WC_Product_Attribute $attribute Product attribute object.
  * @param array  $values    Attribute term values.
  * @return string Modified HTML.
  */
@@ -42,7 +46,7 @@ function wco_obfuscate_attribute_link( string $html, $attribute, $values ): stri
 		return $html;
 	}
 
-	$html = preg_replace_callback(
+	$result = preg_replace_callback(
 		'/(<a\s[^>]*)href=["\']([^"\']*)["\']/',
 		function ( $matches ) {
 			$before = $matches[1];
@@ -52,7 +56,7 @@ function wco_obfuscate_attribute_link( string $html, $attribute, $values ): stri
 		$html
 	);
 
-	return $html;
+	return $result ?? $html;
 }
 
 add_filter( 'woocommerce_attribute', 'wco_obfuscate_attribute_link', 20, 3 );
@@ -87,7 +91,7 @@ function wco_inline_script(): void {
 			if ( ! link ) return;
 			e.preventDefault();
 			if ( e.ctrlKey || e.metaKey ) {
-				window.open( link.url, '_blank' );
+				window.open( link.url, '_blank', 'noopener,noreferrer' );
 			} else {
 				location.href = link.url;
 			}
@@ -98,7 +102,7 @@ function wco_inline_script(): void {
 			var link = getObfuscatedLink( e );
 			if ( ! link ) return;
 			e.preventDefault();
-			window.open( link.url, '_blank' );
+			window.open( link.url, '_blank', 'noopener,noreferrer' );
 		});
 
 		document.addEventListener( 'keydown', function( e ) {
