@@ -16,6 +16,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'WCO_VERSION', '1.0.0' );
 
+add_action( 'before_woocommerce_init', function () {
+	if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+	}
+} );
+
 /**
  * Whether obfuscation assets should load on the current page.
  *
@@ -24,7 +30,7 @@ define( 'WCO_VERSION', '1.0.0' );
 function wco_should_load(): bool {
 	static $should_load = null;
 	if ( null === $should_load ) {
-		$should_load = (bool) apply_filters( 'wco_should_load', is_product() );
+		$should_load = function_exists( 'is_product' ) && (bool) apply_filters( 'wco_should_load', is_product() );
 	}
 	return $should_load;
 }
@@ -66,58 +72,62 @@ add_filter( 'woocommerce_attribute', 'wco_obfuscate_attribute_link', 20, 3 );
  *
  * @return void
  */
-function wco_inline_script(): void {
+function wco_enqueue_script(): void {
 	if ( ! wco_should_load() ) {
 		return;
 	}
-	?>
-	<script>
-	(function() {
-		function isSafeUrl( url ) {
-			if ( ! url || url.startsWith( '//' ) ) return false;
-			return url.startsWith( '/' ) || url.startsWith( location.origin );
-		}
 
-		function getObfuscatedLink( event ) {
-			var el = event.target.closest( '[data-url]' );
-			if ( ! el ) return null;
-			var url = el.getAttribute( 'data-url' );
-			if ( ! isSafeUrl( url ) ) return null;
-			return { el: el, url: url };
-		}
+	wp_register_script( 'wco-obfuscation', false, array(), WCO_VERSION, true );
+	wp_enqueue_script( 'wco-obfuscation' );
 
-		document.addEventListener( 'click', function( e ) {
-			var link = getObfuscatedLink( e );
-			if ( ! link ) return;
-			e.preventDefault();
-			if ( e.ctrlKey || e.metaKey ) {
-				window.open( link.url, '_blank', 'noopener,noreferrer' );
-			} else {
-				location.href = link.url;
-			}
-		});
+	$js = <<<'JS'
+(function() {
+	function isSafeUrl( url ) {
+		if ( ! url || url.startsWith( '//' ) ) return false;
+		return url.startsWith( '/' ) || url.startsWith( location.origin );
+	}
 
-		document.addEventListener( 'auxclick', function( e ) {
-			if ( e.button !== 1 ) return;
-			var link = getObfuscatedLink( e );
-			if ( ! link ) return;
-			e.preventDefault();
+	function getObfuscatedLink( event ) {
+		var el = event.target.closest( '[data-url]' );
+		if ( ! el ) return null;
+		var url = el.getAttribute( 'data-url' );
+		if ( ! isSafeUrl( url ) ) return null;
+		return { el: el, url: url };
+	}
+
+	document.addEventListener( 'click', function( e ) {
+		var link = getObfuscatedLink( e );
+		if ( ! link ) return;
+		e.preventDefault();
+		if ( e.ctrlKey || e.metaKey || e.shiftKey ) {
 			window.open( link.url, '_blank', 'noopener,noreferrer' );
-		});
-
-		document.addEventListener( 'keydown', function( e ) {
-			if ( e.key !== 'Enter' && e.key !== ' ' ) return;
-			var link = getObfuscatedLink( e );
-			if ( ! link ) return;
-			e.preventDefault();
+		} else {
 			location.href = link.url;
-		});
-	})();
-	</script>
-	<?php
+		}
+	});
+
+	document.addEventListener( 'auxclick', function( e ) {
+		if ( e.button !== 1 ) return;
+		var link = getObfuscatedLink( e );
+		if ( ! link ) return;
+		e.preventDefault();
+		window.open( link.url, '_blank', 'noopener,noreferrer' );
+	});
+
+	document.addEventListener( 'keydown', function( e ) {
+		if ( e.key !== 'Enter' ) return;
+		var link = getObfuscatedLink( e );
+		if ( ! link ) return;
+		e.preventDefault();
+		location.href = link.url;
+	});
+})();
+JS;
+
+	wp_add_inline_script( 'wco-obfuscation', $js );
 }
 
-add_action( 'wp_footer', 'wco_inline_script' );
+add_action( 'wp_enqueue_scripts', 'wco_enqueue_script' );
 
 /**
  * Inline CSS for obfuscated links.
