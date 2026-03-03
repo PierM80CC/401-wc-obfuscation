@@ -48,12 +48,12 @@ function wco_obfuscate_attribute_link( string $html, $attribute, $values ): stri
 		return $html;
 	}
 
-	if ( strpos( $html, '<a' ) === false ) {
+	if ( stripos( $html, '<a' ) === false ) {
 		return $html;
 	}
 
 	$result = preg_replace_callback(
-		'/(<a\s[^>]*)href=["\']([^"\']*)["\']/',
+		'/(<a\s[^>]*?(?<=\s))href=["\']([^"\']*)["\']/',
 		function ( $matches ) {
 			$before = $matches[1];
 			$href   = $matches[2];
@@ -83,8 +83,12 @@ function wco_enqueue_script(): void {
 	$js = <<<'JS'
 (function() {
 	function isSafeUrl( url ) {
-		if ( ! url || url.startsWith( '//' ) ) return false;
-		return url.startsWith( '/' ) || url.startsWith( location.origin );
+		try {
+			var parsed = new URL( url, location.origin );
+			return parsed.origin === location.origin;
+		} catch ( e ) {
+			return false;
+		}
 	}
 
 	function getObfuscatedLink( event ) {
@@ -119,7 +123,11 @@ function wco_enqueue_script(): void {
 		var link = getObfuscatedLink( e );
 		if ( ! link ) return;
 		e.preventDefault();
-		location.href = link.url;
+		if ( e.ctrlKey || e.metaKey || e.shiftKey ) {
+			window.open( link.url, '_blank', 'noopener,noreferrer' );
+		} else {
+			location.href = link.url;
+		}
 	});
 })();
 JS;
@@ -138,7 +146,7 @@ function wco_inline_css(): void {
 	if ( ! wco_should_load() ) {
 		return;
 	}
-	echo '<style>a[data-url]{cursor:pointer}</style>';
+	echo '<style>a[data-url]{cursor:pointer;text-decoration:underline}</style>';
 }
 
 add_action( 'wp_head', 'wco_inline_css' );
