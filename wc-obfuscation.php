@@ -146,7 +146,7 @@ function wco_inline_css(): void {
 	if ( ! wco_should_load() ) {
 		return;
 	}
-	echo '<style>a[data-url]{cursor:pointer;text-decoration:underline}</style>';
+	echo '<style>a[data-url]{cursor:pointer}</style>';
 }
 
 add_action( 'wp_head', 'wco_inline_css' );
