@@ -5,3 +5,4 @@ desktop.ini
 .env
 vendor/
 node_modules/
+CLAUDE.md
